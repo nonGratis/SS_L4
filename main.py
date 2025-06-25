@@ -3,7 +3,7 @@
 Консольний інтерфейс для файлової системи
 """
 
-import sys
+import argparse
 from block_device import BlockDevice
 from filesystem import FileSystem
 from vfs import VFS
@@ -13,6 +13,23 @@ class CLI:
         self.device = None
         self.fs = None
         self.vfs = None
+        
+        # Словник команд для оптимізації
+        self.commands = {
+            'help': self.show_help,
+            'mkfs': self.cmd_mkfs,
+            'stat': self.cmd_stat,
+            'ls': self.cmd_ls,
+            'create': self.cmd_create,
+            'open': self.cmd_open,
+            'close': self.cmd_close,
+            'seek': self.cmd_seek,
+            'read': self.cmd_read,
+            'write': self.cmd_write,
+            'link': self.cmd_link,
+            'unlink': self.cmd_unlink,
+            'truncate': self.cmd_truncate,
+        }
     
     def init_fs(self, filename: str = "storage.bin"):
         """Ініціалізувати файлову систему"""
@@ -42,34 +59,12 @@ class CLI:
                 parts = cmd.split()
                 command = parts[0].lower()
                 
-                if command == 'help':
-                    self.show_help()
-                elif command == 'exit' or command == 'quit':
+                if command in ('exit', 'quit'):
                     break
-                elif command == 'mkfs':
-                    self.cmd_mkfs(parts)
-                elif command == 'stat':
-                    self.cmd_stat(parts)
-                elif command == 'ls':
-                    self.cmd_ls()
-                elif command == 'create':
-                    self.cmd_create(parts)
-                elif command == 'open':
-                    self.cmd_open(parts)
-                elif command == 'close':
-                    self.cmd_close(parts)
-                elif command == 'seek':
-                    self.cmd_seek(parts)
-                elif command == 'read':
-                    self.cmd_read(parts)
-                elif command == 'write':
-                    self.cmd_write(parts)
-                elif command == 'link':
-                    self.cmd_link(parts)
-                elif command == 'unlink':
-                    self.cmd_unlink(parts)
-                elif command == 'truncate':
-                    self.cmd_truncate(parts)
+                
+                # Використовуємо словник команд замість довгого if-elif
+                if command in self.commands:
+                    self.commands[command](parts)
                 else:
                     print(f"Невідома команда: {command}")
                 
@@ -260,7 +255,7 @@ class CLI:
             try:
                 text = data.decode('utf-8')
                 print(f"'{text}'")
-            except:
+            except UnicodeDecodeError:
                 print(f"Hex: {data.hex()}")
         else:
             print(f"Помилка читання з fd={fd}")
@@ -303,7 +298,7 @@ class CLI:
         if self.vfs.link(name1, name2):
             print(f"Створено посилання {name2} -> {name1}")
         else:
-            print(f"Помилка створення посилання")
+            print("Помилка створення посилання")
     
     def cmd_unlink(self, parts):
         """Команда unlink"""
@@ -342,12 +337,28 @@ class CLI:
             print(f"Помилка зміни розміру файла {name}")
 
 def main():
+    parser = argparse.ArgumentParser(description='Файлова система - консольний інтерфейс')
+    parser.add_argument('-f', '--file', default='storage.bin', 
+                       help='Файл для зберігання ФС (за замовчуванням: storage.bin)')
+    parser.add_argument('--mkfs', type=int, metavar='N',
+                       help='Створити нову ФС з N дескрипторами та вийти')
+    
+    args = parser.parse_args()
+    
     cli = CLI()
     
-    # Спробувати завантажити існуючу ФС
-    cli.init_fs()
+    # Ініціалізувати ФС з вказаним файлом
+    cli.init_fs(args.file)
     
-    # Запустити інтерфейс
+    # Якщо треба створити нову ФС
+    if args.mkfs:
+        if cli.vfs.mkfs(args.mkfs):
+            print(f"ФС створено з {args.mkfs} дескрипторами в {args.file}")
+        else:
+            print("Помилка створення ФС")
+        return
+    
+    # Запустити інтерактивний інтерфейс
     cli.run()
 
 if __name__ == "__main__":
