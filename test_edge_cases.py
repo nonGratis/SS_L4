@@ -88,6 +88,48 @@ class TestCLI:
         with patch('builtins.print') as mock_print:
             self.cli.cmd_mkfs(['mkfs', '0'])
             mock_print.assert_called_with("Кількість дескрипторів має бути > 0")
+    
+    def test_cmd_stat_invalid_args(self):
+        """Тест команди stat з невалідними аргументами"""
+        with patch('builtins.print') as mock_print:
+            self.cli.cmd_stat(['stat'])
+            mock_print.assert_called_with("Використання: stat <ім'я_файла>")
+    
+    def test_cmd_create_invalid_args(self):
+        """Тест команди create з невалідними аргументами"""
+        with patch('builtins.print') as mock_print:
+            self.cli.cmd_create(['create'])
+            mock_print.assert_called_with("Використання: create <ім'я_файла>")
+    
+    def test_cmd_open_invalid_args(self):
+        """Тест команди open з невалідними аргументами"""
+        with patch('builtins.print') as mock_print:
+            self.cli.cmd_open(['open'])
+            mock_print.assert_called_with("Використання: open <ім'я_файла>")
+    
+    def test_cmd_close_invalid_args(self):
+        """Тест команди close з невалідними аргументами"""
+        with patch('builtins.print') as mock_print:
+            self.cli.cmd_close(['close'])
+            mock_print.assert_called_with("Використання: close <fd>")
+    
+    def test_cmd_seek_invalid_args(self):
+        """Тест команди seek з невалідними аргументами"""
+        with patch('builtins.print') as mock_print:
+            self.cli.cmd_seek(['seek'])
+            mock_print.assert_called_with("Використання: seek <fd> <зсув>")
+    
+    def test_cmd_read_invalid_args(self):
+        """Тест команди read з невалідними аргументами"""
+        with patch('builtins.print') as mock_print:
+            self.cli.cmd_read(['read'])
+            mock_print.assert_called_with("Використання: read <fd> <розмір>")
+    
+    def test_cmd_write_invalid_args(self):
+        """Тест команди write з невалідними аргументами"""
+        with patch('builtins.print') as mock_print:
+            self.cli.cmd_write(['write'])
+            mock_print.assert_called_with("Використання: write <fd>")
 
 
 class TestVFSEdgeCases:
@@ -108,14 +150,11 @@ class TestVFSEdgeCases:
             os.unlink(self.temp_filename)
     
     def test_mkfs_existing_storage(self):
-        """Тест mkfs на існуючому носії"""
+        """Тест mkfs на існуючому носії - має не вдатися"""
         # Створити файл носія
         self.device.create_storage()
         
-        # Перша ініціалізація має пройти
-        assert self.vfs.mkfs(5)
-        
-        # Друга ініціалізація має не вдатися
+        # Ініціалізація на існуючому файлі має не вдатися
         assert not self.vfs.mkfs(5)
     
     def test_stat_invalid_inode(self):

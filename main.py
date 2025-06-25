@@ -3,7 +3,6 @@
 Консольний інтерфейс для файлової системи
 """
 
-import sys
 from block_device import BlockDevice
 from filesystem import FileSystem
 from vfs import VFS
@@ -18,11 +17,11 @@ class CLI:
         """Ініціалізувати файлову систему"""
         self.device = BlockDevice(filename)
         self.fs = FileSystem(self.device)
-        self.vfs = VFS(self.fs)
         
         # Спробувати завантажити існуючу ФС
         if self.device.exists():
             if self.fs.load_metadata():
+                self.vfs = VFS(self.fs)
                 print(f"Завантажено ФС з {filename}")
                 return True
         
@@ -124,8 +123,14 @@ class CLI:
         if not self.device:
             self.init_fs()
         
+        # Якщо VFS не ініціалізована, створити її
+        if not self.vfs:
+            self.device = BlockDevice("storage.bin")
+            self.fs = FileSystem(self.device)
+            self.vfs = VFS(self.fs)
+        
         if self.vfs.mkfs(n):
-            print(f"ФС створено з {n} дескрипторами")
+            print(f"ФС створено з {n} дескрипторями")
         else:
             print("Помилка створення ФС")
     
@@ -260,7 +265,7 @@ class CLI:
             try:
                 text = data.decode('utf-8')
                 print(f"'{text}'")
-            except:
+            except Exception:
                 print(f"Hex: {data.hex()}")
         else:
             print(f"Помилка читання з fd={fd}")
@@ -303,7 +308,7 @@ class CLI:
         if self.vfs.link(name1, name2):
             print(f"Створено посилання {name2} -> {name1}")
         else:
-            print(f"Помилка створення посилання")
+            print("Помилка створення посилання")
     
     def cmd_unlink(self, parts):
         """Команда unlink"""
