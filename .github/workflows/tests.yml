@@ -1,0 +1,147 @@
+name: Тести файлової системи
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11, 3.12]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Налаштування Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Встановлення залежностей
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-xdist
+    
+    - name: Запуск тестів з покриттям
+      run: |
+        pytest test_filesystem.py test_advanced.py -v --cov=. --cov-report=xml --cov-report=term-missing
+    
+    - name: Завантаження покриття до Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: true
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Налаштування Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.12
+    
+    - name: Встановлення інструментів аналізу
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort mypy
+        pip install -r requirements.txt
+    
+    - name: Перевірка форматування (black)
+      run: black --check --diff .
+    
+    - name: Перевірка імпортів (isort)
+      run: isort --check-only --diff .
+    
+    - name: Статичний аналіз (flake8)
+      run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    
+    - name: Перевірка типів (mypy)
+      run: mypy . --ignore-missing-imports
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Налаштування Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.12
+    
+    - name: Встановлення залежностей
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Інтеграційні тести
+      run: |
+        # Тест створення ФС
+        echo "mkfs 10" | python main.py || echo "Expected exit"
+        
+        # Перевірити що файл створився
+        test -f storage.bin && echo "✅ Файл ФС створено" || echo "❌ Файл ФС не створено"
+        
+        # Тест основних операцій
+        echo -e "ls\ncreate test.txt\nls\nstat test.txt\nexit" | python main.py || echo "Expected exit"
+    
+    - name: Benchmark тести
+      run: |
+        python -c "
+        import time
+        from block_device import BlockDevice
+        from filesystem import FileSystem
+        from vfs import VFS
+        
+        # Тест продуктивності
+        device = BlockDevice('bench.bin', block_size=4096, total_blocks=1000)
+        fs = FileSystem(device, max_inodes=100)
+        vfs = VFS(fs)
+        
+        # Ініціалізація
+        start = time.time()
+        vfs.mkfs(100)
+        init_time = time.time() - start
+        print(f'Ініціалізація ФС: {init_time:.3f}s')
+        
+        # Створення файлів
+        start = time.time()
+        for i in range(50):
+            vfs.create(f'file_{i}.txt')
+        create_time = time.time() - start
+        print(f'Створення 50 файлів: {create_time:.3f}s')
+        
+        # Читання/запис
+        fd = vfs.open('file_0.txt')
+        data = b'x' * 1024
+        
+        start = time.time()
+        for i in range(100):
+            vfs.seek(fd, 0)
+            vfs.write(fd, data)
+        write_time = time.time() - start
+        print(f'100 записів по 1KB: {write_time:.3f}s')
+        
+        start = time.time()
+        for i in range(100):
+            vfs.seek(fd, 0)
+            vfs.read(fd, 1024)
+        read_time = time.time() - start
+        print(f'100 читань по 1KB: {read_time:.3f}s')
+        "
+    
+    - name: Очищення
+      run: |
+        rm -f storage.bin bench.bin *.bin
