@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 
 class BlockDevice:
     """Блоковий пристрій - файл або пам'ять"""
